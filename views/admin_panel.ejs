@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMS Admin | TFRF Command Center</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { background-color: #f8fafc; color: #0f172a; overflow: hidden; font-family: 'Inter', sans-serif; }
+        .sidebar { background-color: #b91c1c; width: 380px; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .stat-card { background: white; border-left: 4px solid #dc2626; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        #map { height: 50vh; width: 100%; border-radius: 16px; border: 4px solid white; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); z-index: 10; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #991b1b; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #facc15; border-radius: 10px; }
+        .resolved-row { opacity: 0.6; background-color: #f0fdf4; }
+        
+        /* Layer control styling to match admin theme */
+        .leaflet-control-layers {
+            border: 2px solid #b91c1c !important;
+            border-radius: 8px !important;
+            font-size: 11px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="flex h-screen">
+
+    <aside class="sidebar flex flex-col p-6 z-20 custom-scroll overflow-y-auto">
+        <div class="mb-10 text-center border-b border-red-800 pb-6">
+            <div class="bg-white w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center shadow-inner">
+                <span class="text-red-600 text-3xl font-black">TFRF</span>
+            </div>
+            <h1 class="text-xl font-black text-white tracking-widest uppercase">Mbeya Command</h1>
+            <p class="text-[10px] text-red-200 font-bold tracking-widest uppercase">Admin Management System</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="stat-card p-4 rounded-xl">
+                <p class="text-[10px] text-slate-500 uppercase font-extrabold text-center">Jumla ya Ripoti</p>
+                <h3 class="text-3xl font-black text-red-600 text-center"><%= stats.total %></h3>
+            </div>
+            <div class="stat-card p-4 rounded-xl border-l-green-500">
+                <p class="text-[10px] text-slate-500 uppercase font-extrabold text-center">Zimezimwa</p>
+                <h3 class="text-3xl font-black text-green-600 text-center"><%= stats.resolved %></h3>
+            </div>
+        </div>
+
+        <div class="mb-8 bg-red-900/30 p-4 rounded-2xl border border-red-800">
+            <h4 class="text-[10px] font-black mb-4 uppercase text-yellow-400 tracking-widest">Tathmini ya Operesheni</h4>
+            <canvas id="analyticsChart" height="160"></canvas>
+        </div>
+
+        <div class="flex-1">
+            <h4 class="text-[10px] font-black mb-4 uppercase text-white tracking-widest flex items-center">
+                <span class="w-2 h-2 bg-yellow-400 rounded-full mr-2 animate-pulse"></span>
+                System Logs
+            </h4>
+            <div id="reports-list" class="space-y-3">
+                <% reports.slice(0, 5).forEach(report => { %>
+                    <div class="p-3 bg-white/10 rounded-lg border-l-4 <%= report.is_resolved ? 'border-green-400' : 'border-yellow-400' %> text-white shadow-sm">
+                        <p class="font-black text-[10px] uppercase">ID: <%= report.id %></p>
+                        <p class="text-[10px] opacity-80 truncate"><%= report.description %></p>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-8 overflow-y-auto bg-slate-50">
+        <header class="flex justify-between items-end mb-8">
+            <div>
+                <h2 class="text-3xl font-black text-slate-900 uppercase leading-none italic">Admin Dashboard</h2>
+                <p class="text-sm text-red-600 font-bold mt-2 flex items-center tracking-tight">
+                    MBEYA UNIT | ACCESS LEVEL: ADMINISTRATOR
+                </p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="window.location.reload()" class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs shadow-lg">REFRESH SYSTEM</button>
+            </div>
+        </header>
+
+        <div id="map"></div>
+
+        <div class="mt-8 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest">Incident Management (Access All)</h3>
+                <span class="text-[10px] font-bold text-slate-400">Ripoti <%= reports.length %> zilizopatikana</span>
+            </div>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                        <th class="p-5">Details</th>
+                        <th class="p-5">Location</th>
+                        <th class="p-5">Status</th>
+                        <th class="p-5">Control Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="performanceTable" class="text-sm font-medium divide-y divide-slate-100">
+                    <% reports.forEach(report => { %>
+                        <tr id="row-<%= report.id %>" class="hover:bg-slate-50 transition-colors <%= report.is_resolved ? 'resolved-row' : '' %>">
+                            <td class="p-5">
+                                <p class="font-black text-red-600 text-xs">#TFRF-<%= report.id %></p>
+                                <p class="text-slate-600 text-xs mt-1 font-bold"><%= report.description %></p>
+                            </td>
+                            <td class="p-5 text-slate-400 text-xs italic font-bold">
+                                <%= report.latitude.toFixed(4) %>, <%= report.longitude.toFixed(4) %>
+                            </td>
+                            <td class="p-5">
+                                <span id="status-<%= report.id %>" class="px-3 py-1 rounded-full text-[10px] font-black uppercase <%= report.is_resolved ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse' %>">
+                                    <%= report.is_resolved ? 'IMETATULIWA' : 'INASUBIRI' %>
+                                </span>
+                            </td>
+                            <td class="p-5 flex gap-2">
+                                <% if(!report.is_resolved) { %>
+                                    <button onclick="resolveIncident('<%= report.id %>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md">RESOLVE</button>
+                                <% } %>
+                                <button onclick="deleteIncident('<%= report.id %>')" class="bg-slate-200 hover:bg-red-600 hover:text-white text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all">DELETE</button>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Map Initialization (Advanced Layers)
+        const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        const satelliteMap = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Satellite'
+        });
+
+        var map = L.map('map', {
+            layers: [satelliteMap] // Default view is Satellite
+        }).setView([-8.9094, 33.4608], 13);
+
+        const baseMaps = {
+            "Satellite View": satelliteMap,
+            "Standard Map": standardMap
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        // Load existing report markers
+        <% reports.forEach(report => { %>
+            L.marker([<%= report.latitude %>, <%= report.longitude %>], {
+                icon: L.icon({ 
+                    iconUrl: '<%= report.is_resolved ? "https://cdn-icons-png.flaticon.com/512/190/190411.png" : "https://cdn-icons-png.flaticon.com/512/785/785116.png" %>', 
+                    iconSize: [30, 30] 
+                })
+            }).addTo(map).bindPopup("<b>ID: <%= report.id %></b><br><%= report.description %>");
+        <% }) %>
+
+        // 2. Weekly Analytics
+        const ctx = document.getElementById('analyticsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+                datasets: [{
+                    label: 'Majanga',
+                    data: [<%= stats.total %>, 5, 2, 8, 4, 6, 3],
+                    backgroundColor: '#facc15',
+                    borderRadius: 5
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { ticks: { color: '#ffffff' }, grid: { display: false } } } }
+        });
+
+        // 3. ADMIN ACTIONS
+        async function resolveIncident(id) {
+            if(confirm("Je, unathibitisha kuwa tukio hili limekamilika?")) {
+                const response = await fetch(`/admin/resolve/${id}`, { method: 'POST' });
+                const result = await response.json();
+                if(result.success) {
+                    location.reload();
+                }
+            }
+        }
+
+        async function deleteIncident(id) {
+            if(confirm("ONYO: Je, una uhakika unataka kufuta ripoti hii kabisa?")) {
+                const response = await fetch(`/admin/delete/${id}`, { method: 'DELETE' });
+                const result = await response.json();
+                if(result.success) {
+                    document.getElementById(`row-${id}`).remove();
+                    alert(result.message);
+                }
+            }
+        }
+
+        const socket = io();
+        socket.on('newFireReport', (data) => {
+            new Audio('https://www.soundjay.com/buttons/beep-07.mp3').play();
+            setTimeout(() => { location.reload(); }, 2000);
+        });
+    </script>
+</body>
+</html>

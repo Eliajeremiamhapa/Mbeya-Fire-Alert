@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMS Officer | TFRF Response Unit</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        #map { height: 100vh; width: 100%; background: #e5e7eb; }
+        
+        /* Tactical Glass UI */
+        .tactical-ui { 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px); 
+            border: 3px solid #b91c1c; 
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        .leaflet-routing-container {
+            background: #facc15 !important;
+            color: #b91c1c !important;
+            border-radius: 12px !important;
+            border: 3px solid #b91c1c !important;
+            font-weight: 800 !important;
+            text-transform: uppercase;
+            font-size: 10px !important;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        /* Layer control customization */
+        .leaflet-control-layers {
+            border: 2px solid #b91c1c !important;
+            border-radius: 8px !important;
+            font-weight: bold;
+            font-family: inherit;
+        }
+
+        .officer-pulse {
+            background: #b91c1c;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 0 rgba(185, 28, 28, 0.4);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(185, 28, 28, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0); }
+        }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #b91c1c; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 overflow-hidden font-sans">
+
+    <div class="absolute top-4 left-4 z-[1000] w-80 space-y-3">
+        <div class="bg-red-700 p-3 rounded-t-2xl border-x-4 border-t-4 border-red-800 shadow-lg">
+            <div class="flex items-center justify-between">
+                <h1 class="text-white font-black italic tracking-tighter text-xl">TFRF DISPATCH</h1>
+                <span class="bg-yellow-400 text-red-900 px-2 py-0.5 rounded text-[9px] font-black uppercase">Mbeya Unit</span>
+            </div>
+        </div>
+
+        <div class="tactical-ui p-4 rounded-b-2xl border-t-0">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-red-700 font-black text-[10px] flex items-center uppercase tracking-widest">
+                    <span class="animate-ping mr-2 w-2 h-2 bg-red-600 rounded-full"></span>
+                    MATUKIO LIVE
+                </h2>
+                <span id="incidentCount" class="text-[9px] font-bold text-slate-500 uppercase">Active: <%= reports.length %></span>
+            </div>
+            
+            <div id="incidentBox" class="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scroll">
+                <% if (reports && reports.length > 0) { %>
+                    <% reports.forEach(report => { %>
+                        <div class="p-3 bg-red-50 border-2 border-red-100 rounded-xl shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[8px] font-black text-white bg-red-600 px-1.5 py-0.5 rounded uppercase">Dharura</span>
+                                <span class="text-[9px] font-bold text-slate-400"><%= new Date(report.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) %></span>
+                            </div>
+                            <p class="text-[11px] font-black text-slate-800 leading-tight mb-2"><%= report.description %></p>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="respondTo(<%= report.latitude %>, <%= report.longitude %>, '<%= report.description %>')" 
+                                    class="bg-slate-900 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-slate-800 transition-all">
+                                    ELEKEZA
+                                </button>
+                                <button onclick="markAsResolved(<%= report.id %>)" 
+                                    class="bg-green-600 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-green-700 transition-all">
+                                    NIMEMALIZA
+                                </button>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="py-6 text-center">
+                        <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest italic">Hakuna matukio kwa sasa</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 p-3 rounded-2xl border-2 border-slate-800 shadow-xl">
+            <h3 class="text-blue-400 font-black text-[9px] mb-1 uppercase tracking-widest">Maji (Hydrants)</h3>
+            <div id="hydrantStatus" class="flex items-center text-[10px] text-slate-300 font-semibold">
+                <div class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                Vyanzo vya Mbeya vipo tayari (Active)
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        // 1. Map Layers
+        const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'TFRF'
+        });
+
+        const satelliteMap = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Satellite'
+        });
+
+        // Initialize Map with Satellite as default for details
+        const map = L.map('map', { 
+            zoomControl: false,
+            layers: [satelliteMap] 
+        }).setView([-8.9094, 33.4608], 14);
+
+        // Add Layer Control
+        const baseMaps = {
+            "Satellite View": satelliteMap,
+            "Standard Map": standardMap
+        };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        setTimeout(() => { map.invalidateSize(); }, 500);
+
+        const socket = io();
+        let routingControl = null;
+
+        let officerMarker = L.marker([-8.9094, 33.4608], {
+            icon: L.divIcon({ className: 'officer-pulse', iconSize: [15, 15] })
+        }).addTo(map).bindPopup("Gari la Zimamoto");
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(pos => {
+                const { latitude, longitude } = pos.coords;
+                officerMarker.setLatLng([latitude, longitude]);
+            }, err => console.log("Geo Error:", err), { enableHighAccuracy: true });
+        }
+
+        const fireIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/411/411712.png',
+            iconSize: [40, 40]
+        });
+
+        <% reports.forEach(report => { %>
+            L.marker([<%= report.latitude %>, <%= report.longitude %>], { icon: fireIcon })
+             .addTo(map)
+             .bindPopup("<b>DHARURA:</b><br><%= report.description %>");
+        <% }) %>
+
+        socket.on('newFireReport', (data) => {
+            new Audio('https://www.soundjay.com/buttons/beep-07.mp3').play();
+            setTimeout(() => { location.reload(); }, 2000);
+        });
+
+        async function markAsResolved(reportId) {
+            if(confirm("Je, umefika eneo la tukio na kudhibiti hali?")) {
+                try {
+                    const response = await fetch(`/admin/resolve/${reportId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const result = await response.json();
+                    if(result.success) {
+                        alert("Hongera! Taarifa imetumwa makao makuu.");
+                        location.reload();
+                    }
+                } catch (err) {
+                    alert("Hitilafu: " + err.message);
+                }
+            }
+        }
+
+        function respondTo(destLat, destLng, desc) {
+            if (routingControl) map.removeControl(routingControl);
+            const startPoint = officerMarker.getLatLng();
+
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(startPoint.lat, startPoint.lng),
+                    L.latLng(destLat, destLng)
+                ],
+                lineOptions: {
+                    styles: [
+                        { color: '#b91c1c', weight: 7, opacity: 0.8 }, 
+                        { color: '#facc15', weight: 3, opacity: 1 }
+                    ]
+                },
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: true,
+                show: true
+            }).addTo(map);
+
+            map.flyTo([destLat, destLng], 18); // Zoom in closer for satellite view
+        }
+    </script>
+</body>
+</html>

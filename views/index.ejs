@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMS - SOS Emergency</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Rangi za Zimamoto na Uokoaji */
+        body { background-color: #f8fafc; color: #1e293b; }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 2px solid #ef4444;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .sos-btn {
+            background: radial-gradient(circle, #ef4444 0%, #b91c1c 100%);
+            box-shadow: 0 0 40px rgba(185, 28, 28, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 8px solid white;
+        }
+
+        .sos-btn:active { transform: scale(0.9); }
+        
+        #map { 
+            height: 280px; 
+            border-radius: 20px; 
+            margin-top: 15px; 
+            border: 4px solid white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background: #e5e7eb;
+        }
+
+        .emergency-header {
+            background-color: #b91c1c;
+            border-bottom: 4px solid #facc15;
+        }
+
+        /* Custom style for map labels */
+        .leaflet-control-attribution { font-size: 8px !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center">
+
+    <div class="w-full emergency-header p-4 flex justify-between items-center mb-6 shadow-lg">
+        <h1 class="text-2xl font-black text-white italic tracking-tighter">TFRF <span class="text-yellow-400">SOS</span></h1>
+        <div class="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
+            <span class="text-[10px] font-bold text-white uppercase tracking-widest">Mbeya Hub</span>
+            <div class="status-dot w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
+        </div>
+    </div>
+
+    <div class="flex flex-col items-center justify-center space-y-4 mb-8">
+        <button id="sosAction" class="sos-btn w-52 h-52 rounded-full flex flex-col items-center justify-center">
+            <span class="text-5xl font-black text-white italic">SOS</span>
+            <span class="text-[10px] text-white/80 font-bold tracking-[0.2em] uppercase mt-1">Report Now</span>
+        </button>
+        <p class="text-red-700 font-black text-xs text-center uppercase tracking-widest">Bonyeza hapa kuripoti dharura</p>
+    </div>
+
+    <div class="glass w-[92%] max-w-md p-5 rounded-[2.5rem] mb-6">
+        <div class="flex items-center space-x-3 mb-3">
+            <div class="w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center shadow-sm text-xl">🤖</div>
+            <div>
+                <h3 class="font-black text-sm uppercase text-red-700">Neural Mentor</h3>
+                <p class="text-[10px] text-slate-500 font-bold uppercase">AI Emergency Guide</p>
+            </div>
+        </div>
+        <div id="aiResponse" class="text-sm text-slate-700 min-h-[50px] italic bg-white/50 p-3 rounded-2xl border border-slate-100">
+            "Habari, bonyeza SOS kisha niambie hali ilivyo..."
+        </div>
+        <button id="startAI" class="mt-4 w-full py-3 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg">
+            Ongea na AI Assistant
+        </button>
+    </div>
+
+    <div class="w-[92%] max-w-md mb-10">
+        <div class="flex justify-between items-center mb-2 px-2">
+            <h3 class="font-black text-xs uppercase tracking-widest text-slate-500">Huduma za Karibu (Mbeya)</h3>
+            <span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">SATELLITE LIVE</span>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Implemented Google Hybrid (Satellite + Labels) for better detail
+        const map = L.map('map', { 
+            zoomControl: false,
+            attributionControl: true 
+        }).setView([-8.9094, 33.4608], 15);
+
+        L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: '&copy; Google Maps'
+        }).addTo(map);
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const { latitude, longitude } = position.coords;
+                map.setView([latitude, longitude], 17); // Zoomed in more for satellite detail
+                
+                L.marker([latitude, longitude]).addTo(map)
+                 .bindPopup("<b style='color:red'>UPO HAPA</b>").openPopup();
+                
+                // Keep your custom hydrants/points
+                L.circle([latitude + 0.002, longitude + 0.002], {color: '#ef4444', radius: 20, fillOpacity: 0.5}).addTo(map).bindPopup("Water Hydrant");
+                L.circle([latitude - 0.003, longitude - 0.001], {color: '#facc15', radius: 20, fillOpacity: 0.5}).addTo(map).bindPopup("Emergency Point");
+            });
+        }
+
+        document.getElementById('sosAction').onclick = async () => {
+            navigator.geolocation.getCurrentPosition(async pos => {
+                try {
+                    const res = await fetch('/api/report-fire', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude,
+                            description: "Dharura ya haraka kutoka kwa Mwananchi"
+                        })
+                    });
+                    const result = await res.json();
+                    alert(result.message);
+                } catch (e) {
+                    alert("Imeshindwa kutuma. Tafadhali angalia mtandao.");
+                }
+            });
+        };
+
+        const startAI = document.getElementById('startAI');
+        const aiResponse = document.getElementById('aiResponse');
+
+        startAI.onclick = () => {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'sw-TZ';
+            recognition.start();
+            aiResponse.innerText = "Nakusikiliza...";
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                aiResponse.innerText = `Umesema: "${transcript}". AI inachakata...`;
+                
+                setTimeout(() => {
+                    aiResponse.innerText = "AI: Moto wa umeme! Usitumie maji. Tafuta kizimamoto cha unga (DCP) na kata switch kuu.";
+                }, 2000);
+            };
+        };
+    </script>
+</body>
+</html>
