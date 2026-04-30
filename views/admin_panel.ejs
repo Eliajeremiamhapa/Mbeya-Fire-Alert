@@ -10,13 +10,34 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
-        body { background-color: #f8fafc; color: #0f172a; overflow: hidden; font-family: 'Inter', sans-serif; }
-        .sidebar { background-color: #b91c1c; width: 380px; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        body { background-color: #f8fafc; color: #0f172a; overflow-x: hidden; font-family: 'Inter', sans-serif; }
+        
+        /* Sidebar Responsive Logic */
+        .sidebar { 
+            background-color: #b91c1c; 
+            width: 350px; 
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1); 
+            transition: transform 0.3s ease-in-out;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 50;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); width: 300px; }
+            .sidebar.active { transform: translateX(0); }
+            .main-content { margin-left: 0 !important; }
+        }
+
         .stat-card { background: white; border-left: 4px solid #dc2626; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         #map { height: 50vh; width: 100%; border-radius: 16px; border: 4px solid white; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); z-index: 10; }
+        
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #991b1b; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #facc15; border-radius: 10px; }
+        
         .resolved-row { opacity: 0.6; background-color: #f0fdf4; }
         
         .leaflet-control-layers {
@@ -25,12 +46,41 @@
             font-size: 11px;
             font-weight: bold;
         }
+
+        /* Overlay for mobile when sidebar is open */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+        }
+        .sidebar-overlay.active { display: block; }
     </style>
 </head>
-<body class="flex h-screen">
+<body class="flex min-h-screen">
 
-    <aside class="sidebar flex flex-col p-6 z-20 custom-scroll overflow-y-auto">
-        <div class="mb-10 text-center border-b border-red-800 pb-6">
+    <!-- Overlay kwa ajili ya simu -->
+    <div id="overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Mobile Header with Hamburger -->
+    <div class="lg:hidden fixed top-0 left-0 right-0 bg-red-700 p-4 flex justify-between items-center z-[60] shadow-xl">
+        <div class="flex items-center space-x-2">
+            <div class="bg-white p-1 rounded-full w-8 h-8 flex items-center justify-center">
+                <span class="text-red-700 font-black text-xs">TFRF</span>
+            </div>
+            <span class="text-white font-black uppercase text-sm tracking-tighter">Command Center</span>
+        </div>
+        <button onclick="toggleSidebar()" class="text-white p-2 bg-red-800 rounded-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar flex flex-col p-6 custom-scroll overflow-y-auto pt-20 lg:pt-6">
+        <div class="mb-10 text-center border-b border-red-800 pb-6 hidden lg:block">
             <div class="bg-white w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center shadow-inner">
                 <span class="text-red-600 text-3xl font-black">TFRF</span>
             </div>
@@ -62,7 +112,6 @@
             <div id="reports-list" class="space-y-3">
                 <% reports.slice(0, 5).forEach(report => { %>
                     <div class="p-3 bg-white/10 rounded-lg border-l-4 <%= report.is_resolved ? 'border-green-400' : 'border-yellow-400' %> text-white shadow-sm">
-                        <!-- Mongoose hutumia _id -->
                         <p class="font-black text-[10px] uppercase">ID: <%= report._id.toString().substring(18) %></p>
                         <p class="text-[10px] opacity-80 truncate"><%= report.description %></p>
                     </div>
@@ -71,16 +120,17 @@
         </div>
     </aside>
 
-    <main class="flex-1 p-8 overflow-y-auto bg-slate-50">
-        <header class="flex justify-between items-end mb-8">
+    <!-- Main Content -->
+    <main class="main-content flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 ml-0 lg:ml-[350px] pt-24 lg:pt-8">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
             <div>
-                <h2 class="text-3xl font-black text-slate-900 uppercase leading-none italic">Admin Dashboard</h2>
-                <p class="text-sm text-red-600 font-bold mt-2 flex items-center tracking-tight">
+                <h2 class="text-2xl md:text-3xl font-black text-slate-900 uppercase leading-none italic">Admin Dashboard</h2>
+                <p class="text-xs md:text-sm text-red-600 font-bold mt-2 flex items-center tracking-tight">
                     MBEYA UNIT | ACCESS LEVEL: ADMINISTRATOR
                 </p>
             </div>
-            <div class="flex gap-4">
-                <button onclick="window.location.reload()" class="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs shadow-lg">REFRESH SYSTEM</button>
+            <div class="flex gap-4 w-full md:w-auto">
+                <button onclick="window.location.reload()" class="w-full md:w-auto bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs shadow-lg">REFRESH SYSTEM</button>
             </div>
         </header>
 
@@ -89,42 +139,47 @@
         <div class="mt-8 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
             <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
                 <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest">Incident Management</h3>
-                <span class="text-[10px] font-bold text-slate-400">Ripoti <%= reports.length %> zilizopatikana</span>
+                <span class="text-[10px] font-bold text-slate-400">Ripoti <%= reports.length %></span>
             </div>
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="text-[10px] text-slate-400 uppercase font-black tracking-widest">
-                        <th class="p-5">Details</th>
-                        <th class="p-5">Location</th>
-                        <th class="p-5">Status</th>
-                        <th class="p-5">Control Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="performanceTable" class="text-sm font-medium divide-y divide-slate-100">
-                    <% reports.forEach(report => { %>
-                        <tr id="row-<%= report._id %>" class="hover:bg-slate-50 transition-colors <%= report.is_resolved ? 'resolved-row' : '' %>">
-                            <td class="p-5">
-                                <p class="font-black text-red-600 text-xs">#TFRF-<%= report._id.toString().substring(18) %></p>
-                                <p class="text-slate-600 text-xs mt-1 font-bold"><%= report.description %></p>
-                            </td>
-                            <td class="p-5 text-slate-400 text-xs italic font-bold">
-                                <%= report.latitude.toFixed(4) %>, <%= report.longitude.toFixed(4) %>
-                            </td>
-                            <td class="p-5">
-                                <span id="status-<%= report._id %>" class="px-3 py-1 rounded-full text-[10px] font-black uppercase <%= report.is_resolved ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse' %>">
-                                    <%= report.is_resolved ? 'IMETATULIWA' : 'INASUBIRI' %>
-                                </span>
-                            </td>
-                            <td class="p-5 flex gap-2">
-                                <% if(!report.is_resolved) { %>
-                                    <button onclick="resolveIncident('<%= report._id %>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md">RESOLVE</button>
-                                <% } %>
-                                <button onclick="deleteIncident('<%= report._id %>')" class="bg-slate-200 hover:bg-red-600 hover:text-white text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all">DELETE</button>
-                            </td>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left min-w-[600px]">
+                    <thead>
+                        <tr class="text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                            <th class="p-5">Details</th>
+                            <th class="p-5">Location</th>
+                            <th class="p-5">Status</th>
+                            <th class="p-5">Control Actions</th>
                         </tr>
-                    <% }) %>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody id="performanceTable" class="text-sm font-medium divide-y divide-slate-100">
+                        <% reports.forEach(report => { %>
+                            <tr id="row-<%= report._id %>" class="hover:bg-slate-50 transition-colors <%= report.is_resolved ? 'resolved-row' : '' %>">
+                                <td class="p-5">
+                                    <p class="font-black text-red-600 text-xs">#TFRF-<%= report._id.toString().substring(18) %></p>
+                                    <p class="text-slate-600 text-xs mt-1 font-bold"><%= report.description %></p>
+                                </td>
+                                <td class="p-5 text-slate-400 text-xs italic font-bold">
+                                    <%= report.latitude.toFixed(4) %>, <%= report.longitude.toFixed(4) %>
+                                </td>
+                                <td class="p-5">
+                                    <span id="status-<%= report._id %>" class="px-3 py-1 rounded-full text-[10px] font-black uppercase <%= report.is_resolved ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse' %>">
+                                        <%= report.is_resolved ? 'IMETATULIWA' : 'INASUBIRI' %>
+                                    </span>
+                                </td>
+                                <td class="p-5">
+                                    <div class="flex gap-2">
+                                        <% if(!report.is_resolved) { %>
+                                            <button onclick="resolveIncident('<%= report._id %>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md">RESOLVE</button>
+                                        <% } %>
+                                        <button onclick="deleteIncident('<%= report._id %>')" class="bg-slate-200 hover:bg-red-600 hover:text-white text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all">DELETE</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
 
@@ -132,6 +187,12 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
+        // Sidebar Toggle Logic
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('overlay').classList.toggle('active');
+        }
+
         const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
         const satelliteMap = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
             maxZoom: 20,
