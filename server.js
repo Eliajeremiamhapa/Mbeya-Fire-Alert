@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const https = require('https'); // Imeongezwa kwa ajili ya Self-Ping
 const { Server } = require('socket.io');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -10,6 +11,18 @@ const routes = require('./routes');
 
 const app = express();
 const server = http.createServer(app);
+
+// ==========================================
+// SELF-PING LOGIC (Kuzuia Render Isilale)
+// ==========================================
+setInterval(() => {
+    https.get('https://mbeya-fire-alert.onrender.com/', (res) => {
+        console.log(`📡 Self-Ping: Status Code ${res.statusCode} - Server is Awake.`);
+    }).on('error', (e) => {
+        console.error('❌ Self-Ping Error:', e.message);
+    });
+}, 600000); // Inajipiga kila baada ya dakika 10 (600,000ms)
+// ==========================================
 
 // 1. Ruhusu CORS (Muhimu sana kwa Mobile Apps na Web ili kuzuia Blockage)
 app.use(cors({
@@ -68,7 +81,7 @@ app.post('/api/report-fire', async (req, res) => {
         });
         
         res.json({ 
-            success: true, // Nimebadilisha status kuwa success flag kwa urahisi wa Frontend
+            success: true, 
             message: 'Taarifa imepokelewa GEMS na TFRF wamearifiwa!',
             data: report 
         });
@@ -82,7 +95,6 @@ app.use('/', routes);
 
 /**
  * KUANZISHA DATABASE NA SERVER
- * Nimeongeza Logic ya "Once" ili kuzuia server kuanza mara mbili
  */
 mongoose.connection.once('open', () => {
     server.listen(PORT, () => {
@@ -91,6 +103,7 @@ mongoose.connection.once('open', () => {
         console.log(`📍 Port: ${PORT}`);
         console.log(`🌐 Mbeya Emergency System is Live.`);
         console.log(`📡 Socket.io is monitoring fire alerts...`);
+        console.log(`🚀 Keep-Alive System: Active (10min interval)`);
         console.log(`========================================`);
     });
 });
@@ -99,7 +112,6 @@ mongoose.connection.on('error', (err) => {
     console.error('Hitilafu ya kuunganisha MongoDB:', err.message);
 });
 
-// Hii inasaidia Render isizime server kama connection ya DB ikichelewa kidogo
 if (mongoose.connection.readyState === 1) {
     console.log("Database tayari imeshaunganishwa.");
 }
