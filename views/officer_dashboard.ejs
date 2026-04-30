@@ -53,12 +53,40 @@
         }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #b91c1c; border-radius: 10px; }
+
+        /* Mobile Menu Transitions */
+        #sidePanel {
+            transition: transform 0.3s ease-in-out;
+        }
+        @media (max-width: 768px) {
+            .mobile-hidden {
+                transform: translateX(-120%);
+            }
+            .mobile-visible {
+                transform: translateX(0);
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-900 overflow-hidden font-sans">
 
-    <div class="absolute top-4 left-4 z-[1000] w-80 space-y-3">
-        <div class="bg-red-700 p-3 rounded-t-2xl border-x-4 border-t-4 border-red-800 shadow-lg">
+    <!-- Hamburger Button (Inaonekana kwenye mobile tu) -->
+    <button onclick="togglePanel()" class="md:hidden absolute top-4 left-4 z-[2000] bg-red-700 text-white p-3 rounded-xl shadow-2xl border-2 border-red-900 active:scale-95 transition-transform">
+        <svg id="menuIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+    </button>
+
+    <!-- Sidebar Panel -->
+    <div id="sidePanel" class="absolute top-4 left-4 md:left-4 z-[1000] w-[85%] md:w-80 space-y-3 mobile-hidden md:transform-none">
+        <!-- Close Button kwa ajili ya Simu -->
+        <button onclick="togglePanel()" class="md:hidden absolute -right-2 -top-2 bg-slate-900 text-white rounded-full p-1 border-2 border-white">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+        </button>
+
+        <div class="bg-red-700 p-3 rounded-t-2xl border-x-4 border-t-4 border-red-800 shadow-lg mt-12 md:mt-0">
             <div class="flex items-center justify-between">
                 <h1 class="text-white font-black italic tracking-tighter text-xl">TFRF DISPATCH</h1>
                 <span class="bg-yellow-400 text-red-900 px-2 py-0.5 rounded text-[9px] font-black uppercase">Mbeya Unit</span>
@@ -74,7 +102,7 @@
                 <span id="incidentCount" class="text-[9px] font-bold text-slate-500 uppercase">Active: <%= reports.length %></span>
             </div>
             
-            <div id="incidentBox" class="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scroll">
+            <div id="incidentBox" class="space-y-3 max-h-[350px] md:max-h-[300px] overflow-y-auto pr-1 custom-scroll">
                 <% if (reports && reports.length > 0) { %>
                     <% reports.forEach(report => { %>
                         <div class="p-3 bg-red-50 border-2 border-red-100 rounded-xl shadow-sm">
@@ -89,7 +117,6 @@
                                     class="bg-slate-900 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-slate-800 transition-all">
                                     ELEKEZA
                                 </button>
-                                <!-- Kurekebisha hapa: kutumia report._id kwa ajili ya MongoDB -->
                                 <button onclick="markAsResolved('<%= report._id %>')" 
                                     class="bg-green-600 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-green-700 transition-all">
                                     NIMEMALIZA
@@ -121,6 +148,13 @@
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
     <script>
+        // Toggle Function kwa ajili ya Side Panel
+        function togglePanel() {
+            const panel = document.getElementById('sidePanel');
+            panel.classList.toggle('mobile-hidden');
+            panel.classList.toggle('mobile-visible');
+        }
+
         const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'TFRF'
         });
@@ -177,7 +211,6 @@
         async function markAsResolved(reportId) {
             if(confirm("Je, umefika eneo la tukio na kudhibiti hali?")) {
                 try {
-                    // Kutumia backticks kwa ajili ya MongoDB ID string
                     const response = await fetch(`/admin/resolve/${reportId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
@@ -194,6 +227,9 @@
         }
 
         function respondTo(destLat, destLng, desc) {
+            // Funga panel kwenye simu unapoanza kuelekezwa
+            if (window.innerWidth < 768) togglePanel();
+
             if (routingControl) map.removeControl(routingControl);
             const startPoint = officerMarker.getLatLng();
 
