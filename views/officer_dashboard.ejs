@@ -32,7 +32,6 @@
             overflow-y: auto;
         }
 
-        /* Layer control customization */
         .leaflet-control-layers {
             border: 2px solid #b91c1c !important;
             border-radius: 8px !important;
@@ -90,7 +89,8 @@
                                     class="bg-slate-900 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-slate-800 transition-all">
                                     ELEKEZA
                                 </button>
-                                <button onclick="markAsResolved(<%= report.id %>)" 
+                                <!-- Kurekebisha hapa: kutumia report._id kwa ajili ya MongoDB -->
+                                <button onclick="markAsResolved('<%= report._id %>')" 
                                     class="bg-green-600 text-white text-[9px] font-black py-2 rounded-lg uppercase hover:bg-green-700 transition-all">
                                     NIMEMALIZA
                                 </button>
@@ -121,7 +121,6 @@
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // 1. Map Layers
         const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'TFRF'
         });
@@ -132,13 +131,11 @@
             attribution: 'Google Satellite'
         });
 
-        // Initialize Map with Satellite as default for details
         const map = L.map('map', { 
             zoomControl: false,
             layers: [satelliteMap] 
         }).setView([-8.9094, 33.4608], 14);
 
-        // Add Layer Control
         const baseMaps = {
             "Satellite View": satelliteMap,
             "Standard Map": standardMap
@@ -180,6 +177,7 @@
         async function markAsResolved(reportId) {
             if(confirm("Je, umefika eneo la tukio na kudhibiti hali?")) {
                 try {
+                    // Kutumia backticks kwa ajili ya MongoDB ID string
                     const response = await fetch(`/admin/resolve/${reportId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
@@ -216,7 +214,7 @@
                 show: true
             }).addTo(map);
 
-            map.flyTo([destLat, destLng], 18); // Zoom in closer for satellite view
+            map.flyTo([destLat, destLng], 18);
         }
     </script>
 </body>

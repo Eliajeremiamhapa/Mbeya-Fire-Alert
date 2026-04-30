@@ -42,6 +42,14 @@
 
         /* Custom style for map labels */
         .leaflet-control-attribution { font-size: 8px !important; }
+
+        /* Style ya kuzuia button ikishabonyezwa */
+        .btn-disabled {
+            opacity: 0.6;
+            cursor: not-allowed !important;
+            filter: grayscale(1);
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center">
@@ -59,7 +67,7 @@
             <span class="text-5xl font-black text-white italic">SOS</span>
             <span class="text-[10px] text-white/80 font-bold tracking-[0.2em] uppercase mt-1">Report Now</span>
         </button>
-        <p class="text-red-700 font-black text-xs text-center uppercase tracking-widest">Bonyeza hapa kuripoti dharura</p>
+        <p id="sosStatusText" class="text-red-700 font-black text-xs text-center uppercase tracking-widest">Bonyeza hapa kuripoti dharura</p>
     </div>
 
     <div class="glass w-[92%] max-w-md p-5 rounded-[2.5rem] mb-6">
@@ -90,7 +98,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Implemented Google Hybrid (Satellite + Labels) for better detail
         const map = L.map('map', { 
             zoomControl: false,
             attributionControl: true 
@@ -105,20 +112,36 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
                 const { latitude, longitude } = position.coords;
-                map.setView([latitude, longitude], 17); // Zoomed in more for satellite detail
+                map.setView([latitude, longitude], 17);
                 
                 L.marker([latitude, longitude]).addTo(map)
                  .bindPopup("<b style='color:red'>UPO HAPA</b>").openPopup();
                 
-                // Keep your custom hydrants/points
                 L.circle([latitude + 0.002, longitude + 0.002], {color: '#ef4444', radius: 20, fillOpacity: 0.5}).addTo(map).bindPopup("Water Hydrant");
                 L.circle([latitude - 0.003, longitude - 0.001], {color: '#facc15', radius: 20, fillOpacity: 0.5}).addTo(map).bindPopup("Emergency Point");
             });
         }
 
-        document.getElementById('sosAction').onclick = async () => {
+        // --- UPDATE: SOS BUTTON LOCK LOGIC ---
+        const sosBtn = document.getElementById('sosAction');
+        const sosStatusText = document.getElementById('sosStatusText');
+        const aiResponse = document.getElementById('aiResponse');
+
+        sosBtn.onclick = async () => {
+            // Check if already sent
+            if (sosBtn.classList.contains('btn-disabled')) {
+                alert("Taarifa imeshatumwa tayari! Tafadhali subiri msaada.");
+                return;
+            }
+
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
+                    // Disable button immediately after clicking
+                    sosBtn.classList.add('btn-disabled');
+                    sosStatusText.innerText = "TAARIFA IMETUMWA TAYARI";
+                    sosStatusText.classList.replace('text-red-700', 'text-green-600');
+                    aiResponse.innerText = "Nakutumia msaada sasa hivi. Taarifa imeshafika kituo cha Mbeya...";
+
                     const res = await fetch('/api/report-fire', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -129,15 +152,23 @@
                         })
                     });
                     const result = await res.json();
-                    alert(result.message);
+                    
+                    // Show success message
+                    aiResponse.innerHTML = `<span style="color:green; font-weight:bold;">IMETUMWA!</span> Msaada unakuja eneo ulipo. Kaa mbali na moto.`;
+                    alert("Imetumwa kwa mafanikio!");
+
                 } catch (e) {
+                    // If it fails, let them try again
+                    sosBtn.classList.remove('btn-disabled');
+                    sosStatusText.innerText = "BONYEZA TENA KURIPOTI";
                     alert("Imeshindwa kutuma. Tafadhali angalia mtandao.");
                 }
+            }, (err) => {
+                alert("Tafadhali washa GPS ili Zimamoto wajue ulipo.");
             });
         };
 
         const startAI = document.getElementById('startAI');
-        const aiResponse = document.getElementById('aiResponse');
 
         startAI.onclick = () => {
             const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();

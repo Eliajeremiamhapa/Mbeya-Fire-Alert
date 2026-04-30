@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+// Hakikisha model yako ya Mongoose imetengenezwa vizuri
 const { FireReport } = require('../models');
 
 // 1. MWANANCHI: Landing Page (SOS Button)
@@ -7,14 +8,12 @@ router.get('/', (req, res) => {
     res.render('index');
 });
 
-// 2. OFFICER: TFRF Responder Dashboard (Tracking & Routing)
-// Anaona dharura ambazo bado hazijatatuliwa tu (is_resolved: false)
+// 2. OFFICER: TFRF Responder Dashboard
 router.get('/officer/dashboard', async (req, res) => {
     try {
-        const reports = await FireReport.findAll({ 
-            where: { is_resolved: false }, 
-            order: [['createdAt', 'DESC']] 
-        });
+        // Mongoose: Badala ya .findAll({ where: ... }) tunatumia .find({ ... })
+        const reports = await FireReport.find({ is_resolved: false })
+                                        .sort({ createdAt: -1 }); 
         res.render('officer_dashboard', { reports });
     } catch (err) {
         res.status(500).send("Hitilafu ya Server: " + err.message);
@@ -22,14 +21,11 @@ router.get('/officer/dashboard', async (req, res) => {
 });
 
 // 3. ADMIN: System Management & Analytics
-// Huyu anaona ripoti zote na takwimu kamili za mfumo
 router.get('/admin/panel', async (req, res) => {
     try {
-        const allReports = await FireReport.findAll({ 
-            order: [['createdAt', 'DESC']] 
-        });
+        // Mongoose: .find() bila query inapata zote
+        const allReports = await FireReport.find().sort({ createdAt: -1 });
 
-        // TFRF Stats Logic: Kuhesabu data kwa ajili ya Dashboard ya Admin
         const stats = {
             total: allReports.length,
             resolved: allReports.filter(r => r.is_resolved).length,
@@ -45,16 +41,15 @@ router.get('/admin/panel', async (req, res) => {
     }
 });
 
-// --- ADMIN ACTIONS (Hizi ni njia mpya za kumruhusu Admin ku-access mfumo mzima) ---
+// --- ADMIN ACTIONS ---
 
 // A. API ya Kukamilisha Tukio (Mark as Resolved)
 router.post('/admin/resolve/:id', async (req, res) => {
     try {
         const reportId = req.params.id;
-        await FireReport.update(
-            { is_resolved: true },
-            { where: { id: reportId } }
-        );
+        // Mongoose: Badala ya .update() tunatumia .findByIdAndUpdate()
+        await FireReport.findByIdAndUpdate(reportId, { is_resolved: true });
+        
         res.json({ success: true, message: "Tukio limewekwa kama limekamilika (Resolved)" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -65,19 +60,20 @@ router.post('/admin/resolve/:id', async (req, res) => {
 router.delete('/admin/delete/:id', async (req, res) => {
     try {
         const reportId = req.params.id;
-        await FireReport.destroy({
-            where: { id: reportId }
-        });
+        // Mongoose: Badala ya .destroy() tunatumia .findByIdAndDelete()
+        await FireReport.findByIdAndDelete(reportId);
+        
         res.json({ success: true, message: "Ripoti imefutwa kwenye mfumo" });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 });
 
-// C. API ya Kuripoti Moto (Inatumiwa na SOS Button ya Mwananchi)
+// C. API ya Kuripoti Moto (SOS Button)
 router.post('/api/report-fire', async (req, res) => {
     try {
         const { latitude, longitude, description } = req.body;
+        // Mongoose: .create() inafanya kazi sawasawa kwenye zote mbili
         const newReport = await FireReport.create({
             latitude,
             longitude,

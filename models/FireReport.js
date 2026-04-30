@@ -1,10 +1,24 @@
-const { DataTypes } = require('sequelize');
+const mongoose = require('mongoose');
 
-module.exports = (sequelize) => {
-    return sequelize.define('FireReport', {
-        latitude: { type: DataTypes.FLOAT, allowNull: false },
-        longitude: { type: DataTypes.FLOAT, allowNull: false },
-        description: { type: DataTypes.TEXT, defaultValue: 'Emergency Fire Report' },
-        is_resolved: { type: DataTypes.BOOLEAN, defaultValue: false }
-    });
-};
+const FireReportSchema = new mongoose.Schema({
+    latitude: { 
+        type: Number, 
+        required: true 
+    },
+    longitude: { 
+        type: Number, 
+        required: true 
+    },
+    description: { 
+        type: String, 
+        default: 'Emergency Fire Report' 
+    },
+    is_resolved: { 
+        type: Boolean, 
+        default: false 
+    }
+}, { 
+    timestamps: true // Hii inatengeneza 'createdAt' na 'updatedAt' otomatiki kama Sequelize
+});
+
+module.exports = mongoose.model('FireReport', FireReportSchema);

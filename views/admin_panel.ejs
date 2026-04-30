@@ -19,7 +19,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #facc15; border-radius: 10px; }
         .resolved-row { opacity: 0.6; background-color: #f0fdf4; }
         
-        /* Layer control styling to match admin theme */
         .leaflet-control-layers {
             border: 2px solid #b91c1c !important;
             border-radius: 8px !important;
@@ -63,7 +62,8 @@
             <div id="reports-list" class="space-y-3">
                 <% reports.slice(0, 5).forEach(report => { %>
                     <div class="p-3 bg-white/10 rounded-lg border-l-4 <%= report.is_resolved ? 'border-green-400' : 'border-yellow-400' %> text-white shadow-sm">
-                        <p class="font-black text-[10px] uppercase">ID: <%= report.id %></p>
+                        <!-- Mongoose hutumia _id -->
+                        <p class="font-black text-[10px] uppercase">ID: <%= report._id.toString().substring(18) %></p>
                         <p class="text-[10px] opacity-80 truncate"><%= report.description %></p>
                     </div>
                 <% }) %>
@@ -88,7 +88,7 @@
 
         <div class="mt-8 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
             <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
-                <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest">Incident Management (Access All)</h3>
+                <h3 class="text-xs font-black text-slate-600 uppercase tracking-widest">Incident Management</h3>
                 <span class="text-[10px] font-bold text-slate-400">Ripoti <%= reports.length %> zilizopatikana</span>
             </div>
             <table class="w-full text-left">
@@ -102,24 +102,24 @@
                 </thead>
                 <tbody id="performanceTable" class="text-sm font-medium divide-y divide-slate-100">
                     <% reports.forEach(report => { %>
-                        <tr id="row-<%= report.id %>" class="hover:bg-slate-50 transition-colors <%= report.is_resolved ? 'resolved-row' : '' %>">
+                        <tr id="row-<%= report._id %>" class="hover:bg-slate-50 transition-colors <%= report.is_resolved ? 'resolved-row' : '' %>">
                             <td class="p-5">
-                                <p class="font-black text-red-600 text-xs">#TFRF-<%= report.id %></p>
+                                <p class="font-black text-red-600 text-xs">#TFRF-<%= report._id.toString().substring(18) %></p>
                                 <p class="text-slate-600 text-xs mt-1 font-bold"><%= report.description %></p>
                             </td>
                             <td class="p-5 text-slate-400 text-xs italic font-bold">
                                 <%= report.latitude.toFixed(4) %>, <%= report.longitude.toFixed(4) %>
                             </td>
                             <td class="p-5">
-                                <span id="status-<%= report.id %>" class="px-3 py-1 rounded-full text-[10px] font-black uppercase <%= report.is_resolved ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse' %>">
+                                <span id="status-<%= report._id %>" class="px-3 py-1 rounded-full text-[10px] font-black uppercase <%= report.is_resolved ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600 animate-pulse' %>">
                                     <%= report.is_resolved ? 'IMETATULIWA' : 'INASUBIRI' %>
                                 </span>
                             </td>
                             <td class="p-5 flex gap-2">
                                 <% if(!report.is_resolved) { %>
-                                    <button onclick="resolveIncident('<%= report.id %>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md">RESOLVE</button>
+                                    <button onclick="resolveIncident('<%= report._id %>')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black shadow-md">RESOLVE</button>
                                 <% } %>
-                                <button onclick="deleteIncident('<%= report.id %>')" class="bg-slate-200 hover:bg-red-600 hover:text-white text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all">DELETE</button>
+                                <button onclick="deleteIncident('<%= report._id %>')" class="bg-slate-200 hover:bg-red-600 hover:text-white text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all">DELETE</button>
                             </td>
                         </tr>
                     <% }) %>
@@ -132,7 +132,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Map Initialization (Advanced Layers)
         const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
         const satelliteMap = L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
             maxZoom: 20,
@@ -141,7 +140,7 @@
         });
 
         var map = L.map('map', {
-            layers: [satelliteMap] // Default view is Satellite
+            layers: [satelliteMap]
         }).setView([-8.9094, 33.4608], 13);
 
         const baseMaps = {
@@ -150,17 +149,15 @@
         };
         L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
-        // Load existing report markers
         <% reports.forEach(report => { %>
             L.marker([<%= report.latitude %>, <%= report.longitude %>], {
                 icon: L.icon({ 
                     iconUrl: '<%= report.is_resolved ? "https://cdn-icons-png.flaticon.com/512/190/190411.png" : "https://cdn-icons-png.flaticon.com/512/785/785116.png" %>', 
                     iconSize: [30, 30] 
                 })
-            }).addTo(map).bindPopup("<b>ID: <%= report.id %></b><br><%= report.description %>");
+            }).addTo(map).bindPopup("<b>ID: <%= report._id.toString().substring(18) %></b><br><%= report.description %>");
         <% }) %>
 
-        // 2. Weekly Analytics
         const ctx = document.getElementById('analyticsChart').getContext('2d');
         new Chart(ctx, {
             type: 'bar',
@@ -176,7 +173,6 @@
             options: { plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { ticks: { color: '#ffffff' }, grid: { display: false } } } }
         });
 
-        // 3. ADMIN ACTIONS
         async function resolveIncident(id) {
             if(confirm("Je, unathibitisha kuwa tukio hili limekamilika?")) {
                 const response = await fetch(`/admin/resolve/${id}`, { method: 'POST' });
@@ -192,7 +188,8 @@
                 const response = await fetch(`/admin/delete/${id}`, { method: 'DELETE' });
                 const result = await response.json();
                 if(result.success) {
-                    document.getElementById(`row-${id}`).remove();
+                    const row = document.getElementById(`row-${id}`);
+                    if(row) row.remove();
                     alert(result.message);
                 }
             }
