@@ -59,35 +59,50 @@ io.on('connection', (socket) => {
 });
 
 /**
- * API ya kuripoti moto
+ * API YA USER (Mobile App & Web) - REKEREBISHO KWA AJILI YA MOBILE
+ * Inapokea ripoti na kuituma LIVE kwa Admin/Officer kwa wakati mmoja!
  */
 app.post('/api/report-fire', async (req, res) => {
     try {
         const { latitude, longitude, description } = req.body;
         
+        // 1. Uhakiki muhimu kwa ajili ya Mobile App (Kama GPS imezimwa)
+        if (!latitude || !longitude) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'GPS Coordinates (latitude na longitude) zinahitajika.' 
+            });
+        }
+
+        // 2. Hifadhi ripoti kwenye Database ya MongoDB
         const report = await FireReport.create({ 
-            latitude, 
-            longitude, 
+            latitude: Number(latitude), 
+            longitude: Number(longitude), 
             description: description || "Dharura ya Moto: Mbeya Region" 
         });
         
-        // Tuma alert ya Live
+        // 3. Sukuma taarifa LIVE kwenye Web Dashboard ya Officer (Socket.io)
         io.emit('newFireReport', { 
             id: report._id,
-            latitude, 
-            longitude, 
+            latitude: Number(latitude), 
+            longitude: Number(longitude), 
             description: report.description, 
             timestamp: new Date().toLocaleTimeString('sw-TZ') 
         });
         
-        res.json({ 
+        // 4. Majibu ya kurudi kwenye Mobile App na Web ya User
+        res.status(201).json({ 
             success: true, 
             message: 'Taarifa imepokelewa GEMS na TFRF wamearifiwa!',
             data: report 
         });
+
     } catch (err) {
-        console.error('Kosa la kuripoti:', err.message);
-        res.status(500).json({ success: false, error: 'Imeshindwa kutuma ripoti kwenye mfumo' });
+        console.error('Kosa la kuripoti kutoka kwenye kifaa:', err.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Imeshindwa kutuma ripoti kwenye mfumo wa dharura' 
+        });
     }
 });
 
